@@ -19,18 +19,18 @@ import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
     TextView textView;
-    Button button;
+    URL url;
+    int status;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         textView = (TextView) findViewById(R.id.textView);
-        button = (Button) findViewById(R.id.button);
 
-        // 接続先のURLを指定してHTTP GET実行
-        URL url = null;
+        // 接続先のURLを指定してHTTP PUT実行
         int mission_id = 3;
+        status = 2; //ステータス値の設定(本来はボタンが押されたタイミングで)
         String card_id = "ghthetfe";
         try {
             url = new URL("http://test-ukyankyan.c9users.io/api/missions/"+ mission_id);
@@ -38,27 +38,34 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
             return;
         }
-        new HttpPOSTTask().execute(url);
+        new HttpPUTTask().execute();
     }
 
     // AsyncTaskのサブクラスとして、バックグラウンドでHTTP POSTを指定、ヘッダでPUTにオーバーライドしてTextViewに表示するタスクを定義
-    class HttpPOSTTask extends AsyncTask<URL, Void, String> {
+    //<Void, Void, String>:<入力, 過程, 結果>の型→<doInBackgroundの引数型, doInBackgroundのメソッドの返り値型, onPostExecuteの入力値型>
+    //頭の型をVoidにしてやることで外部の変数の読み出しを可能にしていることに注意。
+    class HttpPUTTask extends AsyncTask<Void, Void, String> {
         // HttpURLConnectionを使ったデータ取得 (バックグラウンド)
         @Override
-        protected String doInBackground(URL... url) {
+        protected String doInBackground(Void... params) {
             String result = "";
-            String token = "9566714722251566337d4a4701de6153"; //本来はこれもsetRequestPropertyに突っ込むべきだが、まだAPIに認証付けてない…
+            String token = "9566714722251566337d4a4701de6153"; //下記コメント参照
             HttpURLConnection urlConnection = null;
 
             try {
-                urlConnection = (HttpURLConnection) url[0].openConnection();
+                urlConnection = (HttpURLConnection) url.openConnection(); //メインスレッドで設定したURLをここで指定
+
+                //送信処理部分
                 urlConnection.setDoOutput(true);
                 urlConnection.setRequestMethod("POST"); //GETかPOSTしか指定できないだと…！？じゃあどっちかと言ったらPOSTで
                 urlConnection.setRequestProperty("Content-type", "application/json"); //送信するものをJSON形式にするよ(※忘れたら駄目)
                 urlConnection.setRequestProperty("X-Http-Method-Override", "put"); //さっきPOSTだって言ったけど本当はやっぱPUTです
+                //本番ではこれも設定、現時点ではまだAPIに認証付けてない…
+                //urlConnection.setRequestProperty("Authorization", "Token token="+ token);
+
                 JSONObject json = new JSONObject(); //送信用json
                 try {
-                    json.put("status", 2); // {"status":2}の作成、複数属性があるならこの命令を複数並べる
+                    json.put("status", status); // {"status":2}の作成、複数属性があるならこの命令を複数並べる
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -67,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
                 wr.flush(); //バッファ内容を送信
                 wr.close(); //Writer系メソッドは最後にclose()しないと駄目
 
-                //返り値の受信部分
+                //返り値の受信処理部分
                 if(urlConnection.getInputStream() != null) {
                     result = IOUtils.toString(urlConnection.getInputStream());
                     Log.d("result", result);
